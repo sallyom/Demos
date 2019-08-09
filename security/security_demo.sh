@@ -41,7 +41,8 @@ cleanup() {
     echo ""
     sudo rm -f /etc/audit/rules.d/audit-demo.rules
     sudo augenrules --load > /dev/null
-    sudo systemctl restart auditd 2> /dev/null
+    #bz https://bugzilla.redhat.com/show_bug.cgi?id=1026648  or something similar? fedora 30
+    sudo service auditd restart 2> /dev/null
     sudo rm -f a_file_owned_by_root
     rm -rf "$PWD"/myvol
     if $BUILDAH_CTR_RMI; then
@@ -84,28 +85,38 @@ setup() {
     fi
     sudo cp /usr/share/doc/audit/rules/10-base-config.rules /etc/audit/rules.d/audit-demo.rules
     sudo augenrules --load > /dev/null
-    sudo systemctl restart auditd 2> /dev/null
+    #bz https://bugzilla.redhat.com/show_bug.cgi?id=1026648  or something similar? fedora 30
+    sudo service auditd restart
+    #sudo systemctl restart auditd 2> /dev/null
     if ! sudo docker images | grep ubuntu | grep latest; then
-	UBUNTU_RMI=true
+	    UBUNTU_RMI=true
         sudo docker pull ubuntu:latest
     fi
     if ! sudo docker images | grep fedora | grep latest; then
-	FEDORA_DOCKER_RMI=true
-	sudo docker pull fedora:latest
+	    FEDORA_DOCKER_RMI=true
+	    sudo docker pull fedora:latest
     fi
     if ! sudo podman images | grep fedora | grep latest; then
-	FEDORA_PODMAN_RMI=true
-	sudo podman pull fedora:latest
+	    FEDORA_PODMAN_RMI=true
+	    sudo podman pull fedora:latest
     fi
+    if ! podman images | grep ubi8-minimal; then
+        UBI8_RMI=true
+        # currently issue with 'podman pull registry.access.redhat.com/ubi8-minimal'
+        # use buildah pull for now
+        buildah pull ubi8-minimal
+    fi
+    echo ""
+
     sudo touch a_file_owned_by_root
     sudo chmod 0600 a_file_owned_by_root
     clear
 }
 
 buildah_image() {
-    if ! sudo podman images  | grep -q -w buildah-ctr; then
-	BUILDAH_CTR_RMI=true
-	sudo podman pull quay.io/buildah/stable
+    if ! sudo podman images  | grep -q -w 'buildah/stable'; then
+	    BUILDAH_CTR_RMI=true
+	    sudo podman pull quay.io/buildah/stable
     fi
 }
 
@@ -130,14 +141,14 @@ buildah_minimal_image() {
   echo "$mnt"
   echo ""
 
-  echo_bright "--> sudo dnf install -y --installroot=\$mnt busybox --releasever=29 --disablerepo=* --enablerepo=fedora"
-  sudo dnf install -y --installroot="$mnt" busybox --releasever=29 --disablerepo=* --enablerepo=fedora 2> /dev/null
+  echo_bright "--> sudo dnf install -y --installroot=\$mnt /home/somalley/s2i/busybox-1.28.3-2.fc29.x86_64.rpm --disablerepo=*"
+  sudo dnf install -y --installroot="$mnt" /home/somalley/s2i/busybox-1.28.3-2.fc29.x86_64.rpm --disablerepo=* 2> /dev/null
   echo ""
 
-  read_bright "--> sudo dnf clean all --installroot=\$mnt"
-  echo ""
-  sudo dnf clean all --installroot="$mnt" 2> /dev/null
-  echo ""
+  #read_bright "--> sudo dnf clean all --installroot=\$mnt"
+  #echo ""
+  #sudo dnf clean all --installroot="$mnt" 2> /dev/null
+  #echo ""
 
   read_bright "--> sudo buildah unmount \$ctr"
   sudo buildah unmount "$ctr"
@@ -147,15 +158,15 @@ buildah_minimal_image() {
   sudo buildah commit --rm "$ctr" minimal-image
   echo ""
 
-  read_bright "--> sudo podman run --rm minimal-image ping"
-  sudo podman run --rm minimal-image ping
+  read_bright "--> sudo podman run minimal-image ping"
+  sudo podman run minimal-image ping
   echo ""
 
-  read_bright "--> sudo podman run --rm minimal-image python"
+  read_bright "--> sudo podman run minimal-image python"
   sudo podman run --rm minimal-image python
   echo ""
 
-  read_bright "--> sudo podman run --rm minimal-image busybox"
+  read_bright "--> sudo podman run  minimal-image busybox"
   sudo podman run --rm minimal-image busybox
   echo ""
 
@@ -207,16 +218,6 @@ _EOF
 podman_rootless() {
     # Rootless podman
     read_yellow "Podman as rootless"
-    echo ""
-
-    read_bright "--> podman images | grep ubi8-minimal"
-    if ! podman images | grep ubi8-minimal; then
-        read_bright "--> podman pull ubi8-minimal"
-        UBI8_RMI=true
-        # currently need 'podman pull registry.access.redhat.com/ubi8-minimal'
-        # use buildah pull for now
-        buildah pull ubi8-minimal
-    fi
     echo ""
 
     read_yellow "non-privileged images"
@@ -284,10 +285,11 @@ Type 'exit' to exit the user namespace and continue running the demo.
     echo ""
 
     read_bright "--> ps -ef | grep -v grep | grep --color=auto 100000"
-    ps -ef | grep -v grep | grep --color=auto 100000
+    ps -ef | grep -v grep | grep -v somalley | grep --color=auto 100000
     echo ""
-    sudo podman stop -l -t 0 2> /dev/null
-    sudo podman rm -f -l 2> /dev/null
+    
+    #sudo podman stop -l -t 0 2> /dev/null
+    #sudo podman rm -f -l 2> /dev/null
 
     read_bright "--> sudo podman run --uidmap 0:200000:5000 -d fedora:latest sleep 1000"
     sudo podman run --net=host --uidmap 0:200000:5000 -d fedora:latest sleep 1000
@@ -333,8 +335,8 @@ podman_fork_exec() {
     sudo auditctl -w /etc/shadow 2>/dev/null
     echo ""
 
-    read_bright "--> sudo podman run --rm --privileged -v /:/host fedora:latest touch /host/etc/shadow"
-    sudo podman run --privileged --rm -v /:/host fedora:latest touch /host/etc/shadow
+    read_bright "--> sudo podman run --privileged --rm -v /:/host fedora:latest touch /host/etc/shadow"
+    sudo podman run --privileged --rm -v /:/host fedora:latest touch /host/etc/shadow 2>/dev/null
     echo ""
 
     read_bright "--> ausearch -m path -ts recent -i | grep touch | grep --color=auto 'auid=[^ ]*'"
@@ -342,7 +344,7 @@ podman_fork_exec() {
     echo ""
 
     read_bright "--> sudo docker run --rm --privileged -v /:/host fedora:latest touch /host/etc/shadow"
-    sudo docker run --privileged --rm -v /:/host fedora:latest touch /host/etc/shadow
+    sudo docker run --rm --privileged -v /:/host fedora:latest touch /host/etc/shadow
     echo ""
 
     read_bright "--> ausearch -m path -ts recent -i | grep touch | grep --color=auto 'auid=[^ ]*'"
