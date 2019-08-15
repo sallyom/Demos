@@ -141,6 +141,7 @@ buildah_minimal_image() {
   echo "$mnt"
   echo ""
 
+  # TODO: pass path to local busybox rpm
   echo_bright "--> sudo dnf install -y --installroot=\$mnt /home/somalley/s2i/busybox-1.28.3-2.fc29.x86_64.rpm --disablerepo=*"
   sudo dnf install -y --installroot="$mnt" /home/somalley/s2i/busybox-1.28.3-2.fc29.x86_64.rpm --disablerepo=* 2> /dev/null
   echo ""
