@@ -159,6 +159,8 @@ This will create a file that will look something like [this](https://github.com/
 
 > Note: You will need to edit the generated yaml to add the [following](https://github.com/umohnani8/Demos/blob/master/llamastack/ramalama-llamastack-ui.yaml#L83-L85) to the llamastack container definition so that the ports are exposed correctly.
 
+> Note: If running on MacOS with GPU-enabled podman machine, you can add the [following](https://github.com/umohnani8/Demos/blob/master/llamastack/ramalama-llamastack-ui.yaml#L86-L88) to enable GPU passthrough from host to podman machine.
+
 Let's stop and remove all the containers we started.
 ```
 podman rm -af

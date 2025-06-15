@@ -83,6 +83,9 @@ spec:
     ports:
     - containerPort: 8321
       hostPort: 8321
+    #resources:
+    #  limits:
+    #    podman.io/device=/dev/dri: 1
   - env:
     - name: TERM
       value: xterm
